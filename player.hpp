@@ -28,8 +28,6 @@ std::ostream &operator<<(std::ostream &os, PlayerChoice const choice){
     return os;
 }
 
-// constexpr size_t grid_size = 2'000;
-
 constexpr size_t heads_limit = 40;
 constexpr size_t tails_limit = 40;
 constexpr size_t flips_limit = 2'033; // increment by 4096 to fit whole number of pages (or at least by 256)
@@ -51,6 +49,7 @@ auto run_single_cell(size_t const heads, size_t const tails, size_t const flips,
     long double bias_score_gain = 0;
     long double skip_score_gain = 0;
     
+    // calculate the score gain of all posible future states
     if (flips == 0)
         skip_score_gain = 0;
     else
@@ -67,6 +66,7 @@ auto run_single_cell(size_t const heads, size_t const tails, size_t const flips,
         bias_score_gain = probability_fair * expected_score_gain_on_failure + probability_bias * (1 + expected_score_gain_on_success);
     }
 
+    // choose the best move (maximise score gain)
     if (fair_score_gain >= bias_score_gain && fair_score_gain >= skip_score_gain){
         expected_score_gain[heads][tails][flips] = fair_score_gain;
         optimal_choice[heads][tails][flips] = PlayerChoice::Fair;
@@ -98,10 +98,6 @@ auto run_single_cell(size_t const heads, size_t const tails, size_t const flips,
 }
 
 auto create_optimal_strategy(){
-    //
-    std::cout << std::fixed << std::setprecision(6);
-    //
-
     // Dimentions: table[n_heads][n_tails][n_flips]
     score_table_t expected_score_gain;
     choice_table_t optimal_choice;
@@ -155,6 +151,8 @@ auto create_optimal_strategy(){
                 }
             }
         }
+
+        // show the 100-coin table of best moves
         for (size_t tails = 0; tails < 10; ++tails){
             for (size_t heads = 0; heads < 10; ++heads)
                 std::cout << optimal_choice[heads][tails][100] << ' ';
@@ -165,8 +163,6 @@ auto create_optimal_strategy(){
         std::cout << "At (0, 0, 100): " << expected_score_gain[0][0][100] << ' ' << optimal_choice[0][0][100] << '\n';
     }
 
-    
-
     return optimal_choice;
 }
 
@@ -175,6 +171,7 @@ class Player{
     public:
         PlayerChoice choose(size_t heads, size_t tails, size_t coins_left) const{
             static const auto optimal_strategy = create_optimal_strategy();
+            // don't go out of bounds
             return optimal_strategy[std::min(heads, heads_limit)][std::min(tails, tails_limit)][std::min(coins_left, flips_limit)];
         }
 };

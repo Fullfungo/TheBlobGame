@@ -3,6 +3,7 @@
 
 
 int main(){
+    std::cout << std::fixed << std::setprecision(6);
     Tester tester;
     Player player;
     auto score = tester.run_tests(player, 100'000);
