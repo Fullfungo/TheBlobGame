@@ -28,16 +28,16 @@ std::ostream &operator<<(std::ostream &os, PlayerChoice const choice){
     return os;
 }
 
-constexpr size_t heads_limit = 40;
-constexpr size_t tails_limit = 40;
-constexpr size_t flips_limit = 2'033; // increment by 4096 to fit whole number of pages (or at least by 256)
+constexpr size_t heads_limit = 100;
+constexpr size_t tails_limit = 80;
+constexpr size_t flips_limit = 512; // increment by 4096 to fit whole number of pages (or at least by 256)
 
 long double probability_of_fair_blob(size_t const heads, size_t const tails){
     return 1 / (1 + powl(1.5l, heads) / powl(2.0l, tails));
 }
 
-using score_table_t = std::array<std::array<std::array<long double, flips_limit + 15>, tails_limit + 1>, heads_limit + 1>;
-using choice_table_t = std::array<std::array<std::array<PlayerChoice, flips_limit + 15>, tails_limit + 1>, heads_limit + 1>;
+using score_table_t = std::array<std::array<std::array<long double, flips_limit>, tails_limit>, heads_limit>; // 64 MB
+using choice_table_t = std::array<std::array<std::array<PlayerChoice, flips_limit>, tails_limit>, heads_limit>; // 4 MB
 
 auto run_single_cell(size_t const heads, size_t const tails, size_t const flips, score_table_t &expected_score_gain, choice_table_t &optimal_choice){
     auto probability_fair = probability_of_fair_blob(heads, tails);
@@ -53,9 +53,9 @@ auto run_single_cell(size_t const heads, size_t const tails, size_t const flips,
     if (flips == 0)
         skip_score_gain = 0;
     else
-        skip_score_gain = probability_of_next_heads * expected_score_gain[heads + 1][tails][flips - 1] + probability_of_next_tails * expected_score_gain[heads][tails + 1][flips - 1];
+        skip_score_gain = probability_of_next_heads * expected_score_gain[std::min(heads + 1, heads_limit - 1)][tails][flips - 1] + probability_of_next_tails * expected_score_gain[heads][std::min(tails + 1, tails_limit - 1)][flips - 1];
 
-    auto expected_score_gain_on_success = expected_score_gain[0][0][flips + 15];
+    auto expected_score_gain_on_success = expected_score_gain[0][0][std::min(flips + 15, flips_limit - 1)];
     auto expected_score_gain_on_failure = expected_score_gain[0][0][flips - 30];
     
     if (flips <= 30){
@@ -77,24 +77,6 @@ auto run_single_cell(size_t const heads, size_t const tails, size_t const flips,
         expected_score_gain[heads][tails][flips] = skip_score_gain;
         optimal_choice[heads][tails][flips] = PlayerChoice::Unsure;
     }
-
-    // Repopulate the borders
-
-    if (heads == heads_limit - 1){
-        expected_score_gain[heads + 1][tails][flips] = expected_score_gain[heads][tails][flips];
-        optimal_choice[heads + 1][tails][flips] = optimal_choice[heads][tails][flips];
-    }
-    
-    if (tails == tails_limit - 1){
-        expected_score_gain[heads][tails + 1][flips] = expected_score_gain[heads][tails][flips];
-        optimal_choice[heads][tails + 1][flips] = optimal_choice[heads][tails][flips];
-    }
-
-    if (flips == flips_limit - 1)
-        for (size_t additional_flips = 1; additional_flips <= 15; ++additional_flips){
-            expected_score_gain[heads][tails][flips + additional_flips] = expected_score_gain[heads][tails][flips];
-            optimal_choice[heads][tails][flips + additional_flips] = optimal_choice[heads][tails][flips];
-        }
 }
 
 auto create_optimal_strategy(){
@@ -113,7 +95,7 @@ auto create_optimal_strategy(){
 
     // run in all directions a lot of times
     // update the tables
-    for (size_t i = 0; i < 10'000; ++i){
+    for (size_t i = 0; i < 4'000; ++i){
         std::cout << i << '\n';
         for (size_t heads = 0; heads < heads_limit; ++heads){
             for (size_t tails = 0; tails < tails_limit; ++tails){
